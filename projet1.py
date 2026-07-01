@@ -1,0 +1,1065 @@
+import os
+import tkinter as tk
+from tkinter import filedialog, messagebox, simpledialog
+import pandas as pd
+from tkinter import ttk
+
+
+class Application:
+    def __init__(self):# creer la fenetre principale et initialiser les variables
+        #crée un dossier Sauvegardes/ si il n’existe pas
+        self.dossier_sauvegarde = "Sauvegardes"
+        os.makedirs(self.dossier_sauvegarde, exist_ok=True)
+
+        # Données
+        self.df = None
+
+        # Historique des actions pour annuler/refaire
+
+        """Le principe est le suivant :
+
+Avant chaque modification du DataFrame, on sauvegarde une copie.
+Si l'utilisateur clique sur Annuler, on revient à la copie précédente.
+Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."""
+
+        self.undo_stack = []
+        self.redo_stack = []
+        
+        
+
+            # Fenêtre principale
+        self.fenetre = tk.Tk()
+        self.fenetre.title("Gestionnaire de Données")
+        # Centrer fenetre sur l'écran
+        # taille générale de la fenêtre
+        largeur_fenetre = 800 # largeur de la fenêtre
+        hauteur_fenetre = 600 # hauteur de la fenêtre
+        largeur_ecran = self.fenetre.winfo_screenwidth() # largeur de l'écran
+        hauteur_ecran = self.fenetre.winfo_screenheight() # hauteur de l'écran
+        position_x = (largeur_ecran - largeur_fenetre) // 2 # position x de la fenêtre
+        position_y = (hauteur_ecran - hauteur_fenetre) // 2 # position y de la fenêtre
+        self.fenetre.geometry(f"{largeur_fenetre}x{hauteur_fenetre}+{position_x}+{position_y}") # position de la fenêtre
+
+        # couleur de fond de la fenêtre
+        self.fenetre.configure(bg="lightblue") # couleur de fond de la fenêtre
+        # transparence de la fenêtre
+        self.fenetre.attributes("-alpha", 1) # transparence de la fenêtre
+
+        # Treeview des fichiers sauvegardés
+        self.tree_fichiers = ttk.Treeview(
+            self.fenetre,
+            columns=("Nom",),
+            show="headings",
+            height=20
+        )
+        # Treeview des données
+        self.tree = ttk.Treeview(self.fenetre, show="headings") # tableau Excel où tu vois les données
+       
+
+        # Création de l'interface
+        self.creer_menu()
+        self.creer_widgets()
+        self.actualiser_fichiers()
+
+    def creer_menu(self):
+        # creer la barre de menu en haut comme excel. c’est juste la barre de commandes de ton logiciel
+        menu_bar = tk.Menu(self.fenetre)
+
+        # Menu Fichier
+        menu_fichier = tk.Menu(menu_bar, tearoff=0)
+
+        # Ajouter les commandes du menu Fichier
+        menu_fichier.add_command(
+            label="Charger",
+            command=self.charger_donnees
+        )
+        menu_fichier.add_command(
+            label="Nouveau_fenetre"       
+        )
+        menu_fichier.add_command(
+            label="Exporter",
+            command=self.exporter_affichage_dans_machine
+        )
+        menu_fichier.add_command(
+            label="Sauvegarder",
+            command=self.sauvegarder_donnees
+        )
+        # Ajouter un séparateur
+        menu_fichier.add_separator()
+
+        menu_fichier.add_command(
+            label="Quitter",
+            command=self.fenetre.quit
+        )
+
+        menu_bar.add_cascade(
+            label="Fichier",
+            menu=menu_fichier
+        )
+
+        # Menu Affichage
+        menu_affichage = tk.Menu(menu_bar, tearoff=0)
+        menu_affichage.add_command(
+            label="Afficher les données",
+            command=self.afficher_donnees
+        )
+        menu_bar.add_cascade(
+            label="Affichage",
+            menu=menu_affichage
+        )
+
+###menu edition 
+
+        menu_edition = tk.Menu(menu_bar, tearoff=0)
+        menu_atteindre = tk.Menu(menu_edition, tearoff=0)
+
+        menu_atteindre.add_command(
+            label="Recherche",
+            command=self.rechercher
+        )
+        menu_atteindre.add_command(
+            label="Recherche et remplacer",
+            command=self.rechercher_et_remplacer
+            )
+        menu_edition.add_cascade(
+            label="Atteindre",
+            menu=menu_atteindre
+        )
+
+        menu_bar.add_cascade(
+            label="Edition",
+            menu=menu_edition
+        )
+
+
+        # Menu Traitement
+
+        menu_traitement = tk.Menu(menu_bar, tearoff=0)
+
+    # ---------- Sous-menu Colonnes ----------
+
+        menu_colonnes = tk.Menu(menu_traitement, tearoff=0)
+
+        menu_colonnes.add_command(
+            label="Ajouter une colonne",
+            command=self.ajouter_colonne
+        )
+
+        menu_colonnes.add_command(
+            label="Supprimer une colonne",
+            command=self.supprimer_colonnes
+        )
+
+        menu_colonnes.add_command(
+            label="Sélectionner des colonnes",
+            command=self.selectionner_colonnes
+        )
+        menu_colonnes.add_command(
+            label="Renommer une colonne",
+            command=self.renommer_colonne
+        )
+
+        menu_traitement.add_cascade(
+            label="Colonnes",
+            menu=menu_colonnes
+        )
+
+        # ---------- Sous-menu Lignes ----------
+
+        menu_lignes = tk.Menu(menu_traitement, tearoff=0)
+
+        menu_lignes.add_command(
+            label="Filtrer les données",
+            command=self.filtrer_donnees
+        )
+
+        menu_traitement.add_cascade(
+            label="Lignes",
+            menu=menu_lignes
+        )
+
+        # ---------- Sous-menu Fichiers ----------
+  
+
+        menu_fusion = tk.Menu(menu_traitement, tearoff=0)
+        menu_jointure = tk.Menu(menu_fusion, tearoff=0)
+
+        menu_jointure.add_command(
+            label="jointure gauche",
+            command=self.jointure_gauche)
+        
+        menu_jointure.add_command(
+            label="jointure droite",
+            command=self.jointure_droite)
+        
+        menu_jointure.add_command(
+            label="jointure interne",
+            command=self.jointure_interne)
+        menu_jointure.add_command(
+            label="jointure externe",
+            command=self.jointure_externe
+        )
+        menu_fusion.add_cascade(
+            label="Jointures",
+            menu=menu_jointure)
+        
+        
+        menu_fusion.add_separator()
+
+        menu_fusion.add_command(
+            label="Concaténer les fichiers"  
+            )
+        menu_traitement.add_cascade(
+            label="Fusion des fichiers",
+            menu=menu_fusion
+            )
+        
+        menu_bar.add_cascade(
+            label="Traitement",
+            menu=menu_traitement
+            )
+        
+
+
+
+
+### menu graphique
+        menu_graphique = tk.Menu(menu_bar, tearoff=0)
+
+        menu_graphique.add_command(
+            label="Courbe"
+        )
+
+        menu_graphique.add_command(
+            label="Histogramme"
+        )
+
+        menu_graphique.add_command(
+            label="Diagramme en barres"
+        )
+
+        menu_bar.add_cascade(
+            label="Graphiques",
+            menu=menu_graphique
+        )
+
+        self.fenetre.config(menu=menu_bar)
+# -------------------------
+    # WIDGETS
+    # -------------------------
+
+    def creer_widgets(self): # Créer les éléments visibles (widgets)
+        
+
+        # Titre
+        titre = tk.Label(
+            self.fenetre,
+            text="Gestionnaire de Données Excel / CSV",
+            font=("Arial", 16, "bold")
+        )
+
+        titre.grid(row=0, column=0, columnspan=2, pady=10)
+
+        # ---------- Treeview des fichiers (épingle) ----------
+
+        
+
+        self.tree_fichiers.heading("Nom", text="Fichiers sauvegardés")
+        self.tree_fichiers.column("Nom", width=220)  # liste des fichiers sauvegardés, 📌 colonne unique : Nom
+
+        self.tree_fichiers.grid(
+            row=1,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="ns"
+        )
+        self.tree_fichiers.bind("<Double-1>", self.ouvrir_fichier) #👉 double clic = ouvrir fichier
+        # ---------- Treeview des données ----------
+        self.tree.grid(
+            row=1,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="nsew"
+        ) #tableau Excel où tu vois les données
+
+        # Permet au Treeview des données de s'agrandir. permet de redimensionner correctement
+        self.fenetre.grid_rowconfigure(1, weight=1)
+        self.fenetre.grid_columnconfigure(1, weight=1)
+
+        self.bouton_supprimer = tk.Button(
+            self.fenetre,
+            text="Supprimer fichier",
+            command=self.supprimer_fichier
+        )
+        self.bouton_supprimer.grid(
+            row=2,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        self.bouton_vider = tk.Button(
+            self.fenetre,
+            text="Vider dossier",
+            command=self.vider_fichiers
+        )
+        self.bouton_vider.grid(
+            row=2,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+        self.bouton_annuler = tk.Button(
+            self.fenetre,
+            text="Annuler",
+            command=self.annuler
+        )
+        self.bouton_annuler.grid(
+            row=2,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+        self.bouton_retablir = tk.Button(
+            self.fenetre,
+            text="Rétablir",
+            command=self.retablir
+        )
+        self.bouton_retablir.grid(
+            row=2,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+
+    def actualiser_fichiers(self): # Afficher tous les fichiers dans le dossier Sauvegardes
+
+        self.tree_fichiers.delete(*self.tree_fichiers.get_children()) #supprime anciens éléments
+
+        for fichier in os.listdir(self.dossier_sauvegarde): # 👉 récupère tous les fichiers
+
+            if fichier.endswith((".csv", ".xlsx")): # 👉 ajoute uniquement CSV et Excel
+
+                self.tree_fichiers.insert(
+                    "",
+                    "end",
+                    values=(fichier,)
+                )
+    def ouvrir_fichier(self, event): # ouvrir depuis la liste. Double clic → charger un fichier
+
+        selection = self.tree_fichiers.selection()
+
+        if not selection:
+            return
+
+        nom = self.tree_fichiers.item(selection[0])["values"][0]
+
+        chemin = os.path.join(self.dossier_sauvegarde, nom)
+
+        try:
+            if nom.endswith(".csv"):
+                self.df = pd.read_csv(chemin)
+            else:
+                self.df = pd.read_excel(chemin)
+
+            self.afficher_donnees()
+
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+
+    def charger_donnees(self): # ouvrir fichier externe
+
+        fichier = filedialog.askopenfilename(
+            title="Choisir un fichier",
+            filetypes=[
+                ("Fichiers Excel", "*.xlsx *.xls"),
+                ("Fichiers CSV", "*.csv")
+                ]
+            )
+
+        if not fichier:
+            return
+
+        try:
+
+            if fichier.endswith((".xlsx", ".xls")):
+
+                self.df = pd.read_excel(fichier)
+
+            elif fichier.endswith(".csv"):
+                self.df = pd.read_csv(
+                        fichier,
+                        sep=None, engine="python"
+                        )
+
+            print(self.df.head())  # Affiche les premières lignes du DataFrame dans la console
+            print(self.df.columns)  # Affiche les noms des colonnes dans la console
+            self.afficher_donnees()
+
+            messagebox.showinfo(
+                "Succès",
+                "Fichier chargé avec succès"
+                )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Erreur",
+                str(e)
+                )
+            
+    def exporter_affichage_dans_machine(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        fichier = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[
+                ("Excel", "*.xlsx"),
+                ("CSV", "*.csv")
+            ]
+        )
+
+        if not fichier:
+            return
+
+        try:
+            if fichier.endswith(".csv"):
+                self.df.to_csv(fichier, index=False)
+            else:
+                self.df.to_excel(fichier, index=False)
+
+            messagebox.showinfo(
+                "Succès",
+                "Fichier exporté avec succès"
+            )
+
+        except Exception as e:
+            messagebox.showerror(
+                "Erreur",
+                str(e)
+            )
+
+     # -------------------------
+    # SAUVEGARDE
+    # -------------------------
+
+    def sauvegarder_donnees(self): 
+
+        #sauvegarde dans le dossier "Sauvegardes"
+        if self.df is None:
+
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+
+            return
+        nom = simpledialog.askstring(
+            "Nom du fichier",
+            "Nom du fichier :"
+        )
+
+        if not nom:
+            return
+
+        chemin = os.path.join(self.dossier_sauvegarde, nom + ".csv")
+
+        self.df.to_csv(chemin, index=False)
+
+        messagebox.showinfo("Succès", "Fichier sauvegardé")
+
+        self.actualiser_fichiers()
+
+
+# -------------------------
+    # AFFICHAGE
+    # -------------------------
+
+    # Déclare une méthode qui affichera le contenu de self.df dans le Treeview. Cette méthode :
+
+        """Vérifie que les données existent.
+        Vide le tableau.
+        Crée les colonnes.
+        Affiche toutes les lignes du DataFrame dans le Treeview."""
+    def afficher_donnees(self): # Affiche les données dans le tableau (Treeview)
+
+        # Si aucun fichier n'a été chargé, la méthode s'arrête
+        if self.df is None:
+            return 
+        
+        # Effacer les anciennes données. Vider le tableau
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        # Définir les colonnes. Crée les colonnes du tableau à partir des colonnes du DataFrame et affiche leurs en-têtes.
+        self.tree["columns"] = list(self.df.columns)
+        self.tree["show"] = "headings"
+
+        # Créer les en-têtes. Donne un nom à chaque colonne et fixe sa largeur.
+        for col in self.df.columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=120)
+
+        # Ajouter les lignes. Parcourt les lignes du DataFrame et les ajoute dans le Treeview.
+        for _, ligne in self.df.iterrows():
+            self.tree.insert("", "end", values=list(ligne))
+
+# -------------------------
+    # EDITION
+    # -------------------------
+    """# recherche dans le tableau.
+    def rechercher(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        recherche = simpledialog.askstring(
+            "Recherche",
+            "Texte à rechercher :"
+        )
+
+        if not recherche:
+            return
+
+        resultats = self.df.apply(lambda x: x.astype(str).str.contains(recherche, case=False)).any(axis=1)
+
+        if resultats.any():
+            self.df = self.df[resultats]
+            self.afficher_donnees()
+            messagebox.showinfo(
+                "Succès",
+                f"{resultats.sum()} résultats trouvés pour '{recherche}'"
+            )
+        else:
+            messagebox.showinfo(
+                "Résultat",
+                f"Aucun résultat trouvé pour '{recherche}'"
+            )"""
+
+    # recherche dans une colonne specifique. L'utilisateur doit entrer le nom de la colonne et le texte à rechercher. Le programme doit vérifier que la colonne existe et afficher un message d'erreur si ce n'est pas le cas. Si la colonne existe le programme doit donner le nombre de résultat trouvé.
+    def rechercher(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        colonne = simpledialog.askstring(
+            "Recherche",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne à rechercher :"
+        )
+
+        if not colonne:
+            return
+
+        if colonne not in self.df.columns:
+            messagebox.showerror(
+                "Erreur",
+                f"Colonne introuvable : {colonne}"
+            )
+            return
+
+        recherche = simpledialog.askstring(
+            "Recherche",
+            "Texte à rechercher :"
+        )
+
+        if not recherche:
+            return
+
+        resultats = self.df[colonne].astype(str).str.contains(recherche, case=False)
+
+        if resultats.any():
+            self.df = self.df[resultats]
+            self.afficher_donnees()
+            messagebox.showinfo(
+                "Succès",
+                f"{resultats.sum()} résultats trouvés pour '{recherche}' dans la colonne '{colonne}'"
+            )
+        else:
+            messagebox.showinfo(
+                "Résultat",
+                f"Aucun résultat trouvé pour '{recherche}' dans la colonne '{colonne}'"
+            )
+    
+    # recherche et remplacer dans une colonne specifique. L'utilisateur doit entrer le nom de la colonne, le texte à rechercher et le texte de remplacement. Le programme doit vérifier que la colonne existe et afficher un message d'erreur si ce n'est pas le cas. Si la colonne existe le programme doit donner le nombre de résultat trouvé et remplacé.
+    def rechercher_et_remplacer(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        colonne = simpledialog.askstring(
+            "Recherche et remplacement",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne à rechercher :"
+        )
+
+        if not colonne:
+            return
+
+        if colonne not in self.df.columns:
+            messagebox.showerror(
+                "Erreur",
+                f"Colonne introuvable : {colonne}"
+            )
+            return
+
+        recherche = simpledialog.askstring(
+            "Recherche et remplacement",
+            "Texte à rechercher :"
+        )
+
+        if not recherche:
+            return
+
+        remplacement = simpledialog.askstring(
+            "Recherche et remplacement",
+            f"Texte de remplacement pour '{recherche}' :"
+        )
+
+        if remplacement is None:
+            return
+
+        resultats = self.df[colonne].astype(str).str.contains(recherche, case=False)
+        nombre_resultats = resultats.sum()
+
+        if nombre_resultats > 0:
+            self.sauvegarder_etat()
+            self.df.loc[resultats, colonne] = self.df.loc[resultats, colonne].astype(str).str.replace(recherche, remplacement, case=False)
+            self.afficher_donnees()
+            messagebox.showinfo(
+                "Succès",
+                f"{nombre_resultats} résultats trouvés et remplacés dans la colonne '{colonne}'"
+            )
+        else:
+            messagebox.showinfo(
+                "Résultat",
+                f"Aucun résultat trouvé pour '{recherche}' dans la colonne '{colonne}'"
+            )
+
+# -------------------------
+    # TRAITEMENT DES DONNÉES
+    # -------------------------
+
+    def supprimer_colonnes(self):
+        if self.df is None:
+
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+
+            return
+
+        colonnes = simpledialog.askstring(
+            "Suppression",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonnes à supprimer (séparées par des virgules) :"
+        )
+
+        if not colonnes:
+            return
+
+        colonnes = [col.strip() for col in colonnes.split(",")]
+
+        for col in colonnes:
+            if col not in self.df.columns:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Colonne introuvable : {col}"
+                )
+                return
+            # self.sauvegarder_etat() Pour sauvegarder l'état avant la suppression des colonnes. anulable pour revenir en arrière si nécessaire.
+        self.sauvegarder_etat()
+        self.df.drop(columns=colonnes, inplace=True)
+
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonnes supprimées : {colonnes}"
+        )
+    def selectionner_colonnes(self):
+        if self.df is None:
+
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+
+            return
+
+        colonnes = simpledialog.askstring(
+            "Filtrage",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonnes à conserver (séparées par des virgules) :"
+        )
+
+        if not colonnes:
+            return
+
+        colonnes = [col.strip() for col in colonnes.split(",")]
+
+        for col in colonnes:
+            if col not in self.df.columns:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Colonne introuvable : {col}"
+                )
+                return
+        self.sauvegarder_etat()
+        self.df = self.df[colonnes]
+
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonnes conservées : {colonnes}"
+        )
+
+    def renommer_colonne(self):
+        if self.df is None:
+
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+
+            return
+
+        colonnes = simpledialog.askstring(
+            "Renommer une colonne",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne à renommer :"
+        )
+
+        if not colonnes:
+            return
+
+        if colonnes not in self.df.columns:
+            messagebox.showerror(
+                "Erreur",
+                f"Colonne introuvable : {colonnes}"
+            )
+            return
+
+        nouveau_nom = simpledialog.askstring(
+            "Renommer une colonne",
+            f"Nouveau nom pour la colonne '{colonnes}' :"
+        )
+
+        if not nouveau_nom:
+            return
+
+        self.sauvegarder_etat()
+        self.df.rename(columns={colonnes: nouveau_nom}, inplace=True)
+
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonne '{colonnes}' renommée en '{nouveau_nom}'"
+        )
+    # filtrer les données selon une condition. Par exemple, si l'utilisateur veut filtrer les données pour ne garder que les lignes où la valeur de la colonne "Age" est supérieure à 30, il pourra entrer "Age > 30" dans une boîte de dialogue. Le programme appliquera ensuite ce filtre et affichera les résultats dans le tableau.
+    def filtrer_donnees(self):
+        if self.df is None:
+
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+
+            return
+
+        condition = simpledialog.askstring(
+            "Filtrage",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nCondition de filtrage (ex: Age > 30) :"
+        )
+
+        if not condition:
+            return
+
+        try:
+            self.sauvegarder_etat()
+            self.df = self.df.query(condition)
+            self.afficher_donnees()
+            messagebox.showinfo(
+                "Succès",
+                f"Données filtrées selon la condition : {condition}"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Erreur",
+                f"Condition invalide : {str(e)}"
+            )
+
+    def ajouter_colonne(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        nom_colonne = simpledialog.askstring(
+            "Nouvelle colonne",
+            "Nom de la nouvelle colonne :"
+        )
+
+        if not nom_colonne:
+            return
+
+        valeur_par_defaut = simpledialog.askstring(
+            "Nouvelle colonne",
+            f"Valeur par défaut pour la colonne '{nom_colonne}' :"
+        )
+
+        self.sauvegarder_etat()
+        self.df[nom_colonne] = valeur_par_defaut
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonne '{nom_colonne}' ajoutée avec la valeur par défaut '{valeur_par_defaut}'"
+        )
+
+    def fusionner_fichiers(self):
+            pass
+
+    
+###### JOINTURE DEUX FICHIERS
+    # chargement du deuxieme fuchier pour la fusion. Le programme doit demander à l'utilisateur de sélectionner un deuxième fichier (Excel ou CSV) et de choisir le type de fusion (concaténation ou jointure). Ensuite, il doit effectuer la fusion et afficher le résultat dans le tableau.
+    def charger_df_secondaire(self):
+
+        fichier = filedialog.askopenfilename(
+            title="Choisir le deuxième fichier",
+            filetypes=[
+                ("Excel", "*.xlsx *.xls"),
+                ("CSV", "*.csv")
+            ]
+        )
+
+        if not fichier:
+            return None
+
+        try:
+            if fichier.endswith(".csv"):
+                return pd.read_csv(fichier)
+            else:
+                return pd.read_excel(fichier)
+
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+            return None
+        
+    def jointure(self, type_join):
+
+        if self.df is None:
+            messagebox.showwarning("Attention", "Aucune donnée chargée")
+            return
+
+        df2 = self.charger_df_secondaire()
+        if df2 is None:
+            return
+
+        # Colonnes (différentes autorisées)
+        col1 = simpledialog.askstring(
+            "Jointure",
+            f"Colonnes fichier principal : {list(self.df.columns)}\n\nColonne fichier 1 :"
+        )
+
+        if not col1:
+            return
+
+        col2 = simpledialog.askstring(
+            "Jointure",
+            f"Colonnes fichier secondaire : {list(df2.columns)}\n\nColonne fichier 2 :"
+        )
+
+        if not col2:
+            return
+
+        try:
+            self.sauvegarder_etat()
+            self.df = pd.merge(
+                self.df,
+                df2,
+                how=type_join,
+                left_on=col1,
+                right_on=col2
+            )
+
+            self.afficher_donnees()
+
+            messagebox.showinfo("Succès", f"Jointure {type_join} effectuée")
+
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+
+    def jointure_gauche(self):
+        self.jointure("left")
+
+    def jointure_droite(self):
+        self.jointure("right")
+
+    def jointure_interne(self):
+        self.jointure("inner")
+
+    def jointure_externe(self):
+        self.jointure("outer")
+
+
+# -------------------------
+    # GRAPHIQUES
+    # -------------------------
+    # 
+    
+        
+
+
+
+
+
+
+
+    # creer une fonction de sauvegarde pour sauvegarder chaque fichier avant chaque modification. Cette fonction doit être appelée avant chaque modification du DataFrame (ajout, suppression, modification de colonnes ou de lignes). Elle doit sauvegarder une copie du DataFrame actuel dans une pile (stack) pour permettre l'annulation des modifications. Si l'utilisateur effectue une nouvelle action après avoir annulé une modification, la pile de redo doit être effacée.
+
+    def sauvegarder_etat(self):
+        if self.df is not None:
+            self.undo_stack.append(self.df.copy(deep=True))
+
+            # une nouvelle action efface le redo
+            self.redo_stack.clear()
+
+                # fonction annuler pour revenir à l'état précédent du DataFrame. Cette fonction doit vérifier si la pile d'annulation (undo_stack) n'est pas vide. Si elle contient des états précédents, elle doit restaurer le DataFrame à l'état précédent et mettre à jour l'affichage. Si la pile est vide, un message d'information doit être affiché pour indiquer qu'aucune action ne peut être annulée.
+    def annuler(self):
+
+        if not self.undo_stack:
+            messagebox.showinfo(
+                "Information",
+                "Aucune action à annuler."
+            )
+            return
+
+        self.redo_stack.append(self.df.copy(deep=True))
+
+        self.df = self.undo_stack.pop()
+
+        self.afficher_donnees()
+    
+                # fonction retablir pour revenir à l'état suivant du DataFrame. Cette fonction doit vérifier si la pile de rétablissement (redo_stack) n'est pas vide. Si elle contient des états suivants, elle doit restaurer le DataFrame à l'état suivant et mettre à jour l'affichage. Si la pile est vide, un message d'information doit être affiché pour indiquer qu'aucune action ne peut être refaite.
+
+    def retablir(self):
+
+        if not self.redo_stack:
+            messagebox.showinfo(
+                "Information",
+                "Aucune action à rétablir."
+            )
+            return
+
+        self.undo_stack.append(self.df.copy(deep=True))
+
+        self.df = self.redo_stack.pop()
+
+        self.afficher_donnees()
+
+   
+
+
+
+    # creer creer un bouton supprimer pour supprimer un ou plusieurs fichiers dans le dossier Sauvegardes. Le bouton doit être placé sous la liste des fichiers sauvegardés. Quand l'utilisateur clique sur le bouton, le programme doit demander confirmation avant de supprimer le fichier sélectionné. Si aucun fichier n'est sélectionné, un message d'avertissement doit s'afficher.
+
+    def supprimer_fichier(self):
+
+        selection = self.tree_fichiers.selection()
+
+        if not selection:
+            messagebox.showwarning(
+                "Attention",
+                "Aucun fichier sélectionné"
+            )
+            return
+
+        nom = self.tree_fichiers.item(selection[0])["values"][0]
+
+        confirmation = messagebox.askyesno(
+            "Confirmation",
+            f"Voulez-vous vraiment supprimer le fichier '{nom}' ?"
+        )
+
+        if confirmation:
+            chemin = os.path.join(self.dossier_sauvegarde, nom)
+            os.remove(chemin)
+            self.actualiser_fichiers()
+            messagebox.showinfo(
+                "Succès",
+                f"Fichier '{nom}' supprimé"
+            )
+
+    # creer un bouton vider pour vider les fichier dans le dossier Sauvegardes. Le bouton doit être placé sous la liste des fichiers sauvegardés. Quand l'utilisateur clique sur le bouton, le programme doit demander confirmation avant de supprimer tous les fichiers dans le dossier Sauvegardes. Si aucun fichier n'est présent, un message d'avertissement doit s'afficher.
+
+    def vider_fichiers(self):
+
+        fichiers = os.listdir(self.dossier_sauvegarde)
+
+        if not fichiers:
+            messagebox.showwarning(
+                "Attention",
+                "Aucun fichier à supprimer"
+            )
+            return
+
+        confirmation = messagebox.askyesno(
+            "Confirmation",
+            "Voulez-vous vraiment supprimer tous les fichiers ?"
+        )
+
+        if confirmation:
+            for fichier in fichiers:
+                chemin = os.path.join(self.dossier_sauvegarde, fichier)
+                os.remove(chemin)
+            self.actualiser_fichiers()
+            messagebox.showinfo(
+                "Succès",
+                "Tous les fichiers ont été supprimés"
+            )
+        
+
+
+
+
+
+    # -------------------------
+    # EXECUTION
+    # -------------------------
+
+
+    def executer(self):
+
+        self.fenetre.mainloop()
+
+# Lancement du programme
+if __name__ == "__main__":
+
+    app = Application()
+    app.executer()
+
+
+
+
