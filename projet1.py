@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import pandas as pd
 from tkinter import ttk
+import matplotlib.pyplot as plt
 
 
 class Application:
@@ -54,6 +55,14 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
         )
         # Treeview des données
         self.tree = ttk.Treeview(self.fenetre, show="headings") # tableau Excel où tu vois les données
+
+        # barre de défilement verticale et orizontale
+        ## verticale
+        self.scrollbar_y=ttk.Scrollbar(self.fenetre, orient="vertical", command=self.tree.yview)
+         ## horizontal
+        self.scrollbar_x=ttk.Scrollbar(self.fenetre, orient="horizontal", command=self.tree.xview)
+
+
        
 
         # Création de l'interface
@@ -139,10 +148,31 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
     # ---------- Sous-menu Colonnes ----------
 
         menu_colonnes = tk.Menu(menu_traitement, tearoff=0)
+        menu_ajout_colonne = tk.Menu(menu_colonnes, tearoff=0)
 
-        menu_colonnes.add_command(
-            label="Ajouter une colonne",
-            command=self.ajouter_colonne
+        menu_ajout_colonne.add_command(
+            label="Ajouter colonne simple",
+            command=self.ajouter_colonne_simple
+        )
+
+        menu_ajout_colonne.add_command(
+            label="Ajouter colonne avec formule",
+            command=self.ajouter_colonne_avec_formule
+        )
+
+        menu_ajout_colonne.add_command(
+            label="Ajouter colonne CRM",
+            command=self.ajouter_colonne_CRM
+        )
+
+        menu_ajout_colonne.add_command(
+            label="Ajouter colonne Blank",
+            command=self.ajouter_colonne_blank
+        )
+
+        menu_colonnes.add_cascade(
+            label="Ajouter",
+            menu=menu_ajout_colonne
         )
 
         menu_colonnes.add_command(
@@ -207,7 +237,8 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
         menu_fusion.add_separator()
 
         menu_fusion.add_command(
-            label="Concaténer les fichiers"  
+            label="Concaténer les fichiers", 
+            command=self.concatener_fichiers
             )
         menu_traitement.add_cascade(
             label="Fusion des fichiers",
@@ -220,22 +251,53 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             )
         
 
+### menu statistique
+        menu_statistique = tk.Menu(menu_bar, tearoff=0)
 
+        menu_statistique.add_command(
+            label="type de donnée",
+            command=self.type_donnée
+        )
 
+        menu_statistique.add_command(
+            label="nombre occurrence objet",
+            command=self.nombre_occurrence_objet
+        )
+
+        menu_statistique.add_command(
+            label="statistique descriptive",
+            command=self.statitique_descriptive
+        )
+
+        menu_bar.add_cascade(
+            label="Statistique",
+            menu=menu_statistique)
 
 ### menu graphique
         menu_graphique = tk.Menu(menu_bar, tearoff=0)
+        menu_courbe=tk.Menu(menu_graphique, tearoff=0)
 
-        menu_graphique.add_command(
-            label="Courbe"
+        menu_courbe.add_command(
+            label="courbe from dataframe",
+            command=self.courbe_from_dataframe
+        )
+
+        menu_courbe.add_command(
+            label="courbe blank",
+            command=self.courbe_blank
+        )
+        
+        menu_graphique.add_cascade(
+            label="Courbes",
+            menu=menu_courbe
         )
 
         menu_graphique.add_command(
-            label="Histogramme"
+            label="histogramme"
         )
 
         menu_graphique.add_command(
-            label="Diagramme en barres"
+            label="diagramme en barres"
         )
 
         menu_bar.add_cascade(
@@ -275,6 +337,7 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             sticky="ns"
         )
         self.tree_fichiers.bind("<Double-1>", self.ouvrir_fichier) #👉 double clic = ouvrir fichier
+
         # ---------- Treeview des données ----------
         self.tree.grid(
             row=1,
@@ -293,6 +356,12 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             text="Supprimer fichier",
             command=self.supprimer_fichier
         )
+        # LIASON DES BARRE DE DEFILEMENT AVEC LE TREEVIEW DES DONNEES et placement
+        self.tree.config(yscrollcommand=self.scrollbar_y.set, xscrollcommand=self.scrollbar_x.set)
+        self.scrollbar_y.grid(row=1, column=2, sticky="ns")
+        self.scrollbar_x.grid(row=2, column=1, sticky="ew")
+
+        # BOUTON SUPPRIMER FICHIER
         self.bouton_supprimer.grid(
             row=2,
             column=0,
@@ -300,7 +369,7 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             pady=10,
             sticky="w"
         )
-
+        # BOUTON VIDER DOSSIER
         self.bouton_vider = tk.Button(
             self.fenetre,
             text="Vider dossier",
@@ -313,25 +382,30 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             pady=10,
             sticky="e"
         )
+
+        # BOUTON ANNULER ET RETABLIR
+        ## bouton annuler
         self.bouton_annuler = tk.Button(
             self.fenetre,
             text="Annuler",
             command=self.annuler
         )
         self.bouton_annuler.grid(
-            row=2,
+            row=3,
             column=1,
             padx=10,
             pady=10,
             sticky="w"
         )
+
+        ## bouton retablir
         self.bouton_retablir = tk.Button(
             self.fenetre,
             text="Rétablir",
             command=self.retablir
         )
         self.bouton_retablir.grid(
-            row=2,
+            row=3,
             column=1,
             padx=10,
             pady=10,
@@ -399,8 +473,9 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
                         sep=None, engine="python"
                         )
 
-            print(self.df.head())  # Affiche les premières lignes du DataFrame dans la console
-            print(self.df.columns)  # Affiche les noms des colonnes dans la console
+            """print(self.df.head())  # Affiche les premières lignes du DataFrame dans la console
+            print(self.df.columns)  # Affiche les noms des colonnes dans la console"""
+
             self.afficher_donnees()
 
             messagebox.showinfo(
@@ -493,9 +568,10 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
         Vide le tableau.
         Crée les colonnes.
         Affiche toutes les lignes du DataFrame dans le Treeview."""
-    def afficher_donnees(self): # Affiche les données dans le tableau (Treeview)
 
+    def afficher_donnees(self): # Affiche les données dans le tableau (Treeview) avec les colonnes et les lignes du DataFrame. Cette méthode est appelée après le chargement d'un fichier ou après toute modification des données. cet affichage est dynamique et s'adapte aux changements du DataFrame. Elle permet à l'utilisateur de visualiser les données de manière claire et organisée. la colonne index est ajoutée pour que l'utilisateur puisse voir le numéro de ligne.
         # Si aucun fichier n'a été chargé, la méthode s'arrête
+
         if self.df is None:
             return 
         
@@ -504,17 +580,34 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             self.tree.delete(item)
 
         # Définir les colonnes. Crée les colonnes du tableau à partir des colonnes du DataFrame et affiche leurs en-têtes.
+        
         self.tree["columns"] = list(self.df.columns)
-        self.tree["show"] = "headings"
+        self.tree["show"] = "tree headings"
 
-        # Créer les en-têtes. Donne un nom à chaque colonne et fixe sa largeur.
+        # Créer les en-têtes. Donne un nom à chaque colonne et fixe sa largeur
+
+            # creer l'entete index
+        self.tree.heading("#0", text="Index")
+        self.tree.column("#0",width=50, stretch=False) 
+
+            # creer les autre entete
         for col in self.df.columns:
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=120)
+            self.tree.column(col,width=80, stretch=False)
 
         # Ajouter les lignes. Parcourt les lignes du DataFrame et les ajoute dans le Treeview.
-        for _, ligne in self.df.iterrows():
-            self.tree.insert("", "end", values=list(ligne))
+        for index, ligne in self.df.iterrows():
+            self.tree.insert("", "end", text=index, values=list(ligne))
+
+
+        
+           
+        
+
+
+
+
+
 
 # -------------------------
     # EDITION
@@ -658,6 +751,180 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
 # -------------------------
     # TRAITEMENT DES DONNÉES
     # -------------------------
+
+    def ajouter_colonne_simple(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        nom_colonne = simpledialog.askstring(
+            "Nouvelle colonne",
+            "Nom de la nouvelle colonne :"
+        )
+
+        if not nom_colonne:
+            return
+
+        valeur_par_defaut = simpledialog.askstring(
+            "Nouvelle colonne",
+            f"Valeur par défaut pour la colonne '{nom_colonne}' :"
+        )
+        if valeur_par_defaut is None:
+            return
+        
+
+        self.sauvegarder_etat()
+        self.df[nom_colonne] = valeur_par_defaut
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonne '{nom_colonne}' ajoutée avec la valeur par défaut '{valeur_par_defaut}'"
+        )
+
+    def ajouter_colonne_avec_formule(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        nom_colonne = simpledialog.askstring(
+            "Nouvelle colonne avec formule",
+            "Nom de la nouvelle colonne :"
+        )
+
+        if not nom_colonne:
+            return
+
+        formule = simpledialog.askstring(
+            "Nouvelle colonne avec formule",
+            f"Formule pour la colonne '{nom_colonne}' (ex: Col1 + Col2) :"
+        )
+
+        if not formule:
+            return
+
+        try:
+            self.sauvegarder_etat()
+            self.df[nom_colonne] = self.df.eval(formule)
+            self.afficher_donnees()
+
+            messagebox.showinfo(
+                "Succès",
+                f"Colonne '{nom_colonne}' ajoutée avec la formule '{formule}'"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Erreur",
+                f"Formule invalide : {str(e)}"
+            )
+
+    # ajouter colonne CRM. ajouter deux colonne nommé teneur_moy et ecart_typ et demander à l'utilisateur de donner les valeur par défaut pour ces deux colonne. ajouter quatre autres colonne nommée tm_plus_3et, tm_plus_2et, tm_moins_2et, tm_moins_3et et les valeur par défaut sont calculé automatiquement à partir des deux première colonne. les valeurs sont calculé comme suit : tm_plus_3et = t_moyenne + 3*ecart_typ, tm_plus_2et = t_moyenne + 2*ecart_typ, tm_moins_2et = t_moyenne - 2*ecart_typ, tm_moins_3et = t_moyenne - 3*ecart_typ. les colonnes sont nommées t_moyenne, ecart_typ, tm_plus_3et, tm_plus_2et, tm_moins_2et, tm_moins_3et
+
+    #dans cette etépe on créee 6 colonnes.les nom des colonnes sont préétablit et sont t_moyenne, ecart_typ, tm_plus_3et, tm_plus_2et, tm_moins_2et, tm_moins_3et . l'utilisateur donne les deux premiere colonne qui sont t_moyenne(tm), ecart_typ(et) et les valeurs par défaut. les quatres autres colonnes sont calculées automatiquement t_moyenne +3*ecart_typ, t_moyenne +2*ecart_typ, t_moyenne -2*ecart_typ, t_moyenne -3*ecart_typ. les colonnes sont nommées t_moyenne, ecart_typ, tm_plus_3et, tm_plus_2et, tm_moins_2et, tm_moins_3et
+    def ajouter_colonne_CRM(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        valeur_teneur_moy = simpledialog.askstring(
+            "Nouvelle colonne CRM",
+            "Valeur par défaut pour la colonne 'teneur_moy' :"
+        )
+
+        if valeur_teneur_moy is None:
+            return
+
+        valeur_ecart_typ = simpledialog.askstring(
+            "Nouvelle colonne CRM",
+            "Valeur par défaut pour la colonne 'ecart_typ' :"
+        )
+
+        if valeur_ecart_typ is None:
+            return
+
+        try:
+            valeur_teneur_moy = float(valeur_teneur_moy)
+            valeur_ecart_typ = float(valeur_ecart_typ)
+        except ValueError:
+            messagebox.showerror(
+                "Erreur",
+                "Les valeurs doivent être des nombres"
+            )
+            return
+
+        self.sauvegarder_etat()
+        self.df['teneur_moy'] = valeur_teneur_moy
+        self.df['ecart_typ'] = valeur_ecart_typ
+        self.df['tm_plus_3et'] = self.df['teneur_moy'] + 3 * self.df['ecart_typ']
+        self.df['tm_plus_2et'] = self.df['teneur_moy'] + 2 * self.df['ecart_typ']
+        self.df['tm_moins_2et'] = self.df['teneur_moy'] - 2 * self.df['ecart_typ']
+        self.df['tm_moins_3et'] = self.df['teneur_moy'] - 3 * self.df['ecart_typ']
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonnes 'teneur_moy' et 'ecart_typ' ajoutées avec les valeurs par défaut '{valeur_teneur_moy}' et '{valeur_ecart_typ}'"
+        )
+
+
+# pour blank : l'utilisateur ajoute au dataframe  deux colonnes prénommés. La premiére colonne s'appelle LD et la deuxiéme colonne s'appelle LDA. L'utilisateur doit entrer les valeurs par défaut pour ces deux colonnes
+    def ajouter_colonne_blank(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        valeur_LD = simpledialog.askstring(
+            "Nouvelle colonne Blank",
+            "Valeur par défaut pour la colonne 'LD' (limite de détection) :"
+        )
+
+        if valeur_LD is None:
+            return
+
+        valeur_LDA = simpledialog.askstring(
+            "Nouvelle colonne Blank",
+            "Valeur par défaut pour la colonne 'LDA' (limite d'alerte) :"
+        )
+
+        
+        if valeur_LDA is None:
+            return
+        
+
+        try:
+            valeur_LD = float(valeur_LD)
+            valeur_LDA = float(valeur_LDA)
+        except ValueError:
+            messagebox.showerror(
+                "Erreur",
+                "Les valeurs doivent être des nombres"
+            )
+            return
+
+        self.sauvegarder_etat()
+        self.df['LD'] = valeur_LD
+        self.df['LDA'] = valeur_LDA
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"Colonnes 'LD' et 'LDA' ajoutées avec les valeurs par défaut '{valeur_LD}' et '{valeur_LDA}'"
+        )
+
+
+
 
     def supprimer_colonnes(self):
         if self.df is None:
@@ -808,35 +1075,7 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
                 f"Condition invalide : {str(e)}"
             )
 
-    def ajouter_colonne(self):
-        if self.df is None:
-            messagebox.showwarning(
-                "Attention",
-                "Aucune donnée chargée"
-            )
-            return
-
-        nom_colonne = simpledialog.askstring(
-            "Nouvelle colonne",
-            "Nom de la nouvelle colonne :"
-        )
-
-        if not nom_colonne:
-            return
-
-        valeur_par_defaut = simpledialog.askstring(
-            "Nouvelle colonne",
-            f"Valeur par défaut pour la colonne '{nom_colonne}' :"
-        )
-
-        self.sauvegarder_etat()
-        self.df[nom_colonne] = valeur_par_defaut
-        self.afficher_donnees()
-
-        messagebox.showinfo(
-            "Succès",
-            f"Colonne '{nom_colonne}' ajoutée avec la valeur par défaut '{valeur_par_defaut}'"
-        )
+    
 
     def fusionner_fichiers(self):
             pass
@@ -923,15 +1162,283 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
     def jointure_externe(self):
         self.jointure("outer")
 
+    # concaténer les fichiers. Le programme doit demander à l'utilisateur de sélectionner un deuxième fichier (Excel ou CSV) et de choisir si la concaténation doit se faire par lignes ou par colonnes. Ensuite, il doit effectuer la concaténation et afficher le résultat dans le tableau.
+    def concatener_fichiers(self):
+        if self.df is None:
+            messagebox.showwarning("Attention", "Aucune donnée chargée")
+            return
 
+        df2 = self.charger_df_secondaire()
+        if df2 is None:
+            return
+
+        orientation = simpledialog.askstring(
+            "Concaténation",
+            "Concaténer par lignes (vertical) ou par colonnes (horizontal) ? (v/h)"
+        )
+
+        if orientation not in ["v", "h"]:
+            messagebox.showerror("Erreur", "Orientation invalide")
+            return
+
+        try:
+            self.sauvegarder_etat()
+            if orientation == "v":
+                self.df = pd.concat([self.df, df2], axis=0, ignore_index=True)
+            else:
+                self.df = pd.concat([self.df, df2], axis=1)
+
+            self.afficher_donnees()
+
+            messagebox.showinfo("Succès", "Concaténation effectuée")
+
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+
+## statistique 
+## d'abitude les fonction statistque envoi du texte ou des tableau donc le mieu c'est de creer une fenetre(Toplevel) qui vas afficher ces texte ou tableau dans une nouvelle fentre sans rapport avec notre fenetre peincipal.
+    def fenetre_affichage_stat(self, titre, contenu):
+        top_fenetre = tk.Toplevel(self.fenetre)
+        top_fenetre.title(titre)
+        top_fenetre.geometry("600x400")
+
+        # Permet au widget Text de s'agrandir avec la fenêtre
+        top_fenetre.rowconfigure(0, weight=1)
+        top_fenetre.columnconfigure(0, weight=1)
+
+        # Zone de texte
+        texte_widget = tk.Text(top_fenetre, wrap="none")
+
+        # Barre de défilement verticale
+        scrollbar_toplevel_y = tk.Scrollbar(top_fenetre, orient="vertical",
+                                command=texte_widget.yview)
+
+        # Barre de défilement horizontal
+
+        scrollbar_toplevel_x = tk.Scrollbar(top_fenetre, orient="vertical",
+                                command=texte_widget.xview)
+        
+        texte_widget.configure(
+        yscrollcommand=scrollbar_toplevel_y.set,
+        xscrollcommand=scrollbar_toplevel_x.set
+    )
+        
+
+        # Placement
+        texte_widget.grid(row=0, column=0, sticky="nsew")
+        scrollbar_toplevel_y.grid(row=0, column=1, sticky="ns")
+        scrollbar_toplevel_x.grid(row=1, column=0, sticky="ew")
+
+
+        # Insertion du contenu
+        texte_widget.insert(tk.END, contenu)
+
+        # Lecture seule
+        texte_widget.config(state="disabled")
+# fonction dtype
+# creer une fonction qui génére le nombre de type de donnée présent dans notre donnée c'est a dire pour colonne X on a tel nombre de données int, float, str. 
+
+    def type_donnée (self) :
+        
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+               # Normalement, df.info() affiche son résultat directement dans la console. Grâce à StringIO, on peut récupérer ce texte dans une variable au lieu de l'envoyer à l'écran. 
+        from io import StringIO
+        buffer_info=StringIO()  # On crée un espace vide qui va recevoir le texte produit par df.info().On peut l'imaginer comme un cahier vide.
+        self.df.info(buf=buffer_info) # Écrire les informations dans ce buffer c'est-à-dire dans notre cahier vide. Au lieu d'afficher le texte à l'écran, df.info() l'écrit dans buffer_info.
+
+
+        self.fenetre_affichage_stat("Information sur type de donnée", buffer_info.getvalue()) # Afficher le résultat dans une fenêtre
+
+    def statitique_descriptive(self):
+
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        from io import StringIO
+        buffer_stat_descriptive=StringIO()
+        self.df.describe(include="all").to_string(buf=buffer_stat_descriptive)
+
+        self.fenetre_affichage_stat("Information sur type de donnée", buffer_stat_descriptive.getvalue())
+
+
+    # nombre d'occurence des colonne de type object. creer une fonction qui genere le nombre d'occurence de chaque valeur pour chaque colonne de type object. afficher le resultat dans une nouvelle sous forme de tableau avec la colonne de gauche le nom de la colonne et la colonne de droite le nombre d'occurence de chaque valeur. afficher le resultat dans une nouvelle fenetre avec un widget Text et une barre de defilement.
+    def nombre_occurrence_objet(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        colonnes_objet = self.df.select_dtypes(include=["object"]).columns
+
+        if len(colonnes_objet) == 0:
+            messagebox.showinfo(
+                "Information",
+                "Aucune colonne de type 'object' trouvée"
+            )
+            return
+
+        from io import StringIO
+        buffer_occurrence=StringIO()
+
+        for col in colonnes_objet:
+            buffer_occurrence.write(f"Colonne : {col}\n")
+            buffer_occurrence.write(self.df[col].value_counts().to_string())
+            buffer_occurrence.write("\n\n")
+
+        self.fenetre_affichage_stat("Nombre d'occurrences des colonnes de type 'object'", buffer_occurrence.getvalue())
+
+
+        
 # -------------------------
     # GRAPHIQUES
     # -------------------------
-    # 
+    # courbe avec matplotlib. plt.figure() pour creer plusieurs courbe dans la meme graphique. demander l'utilisateur de choisir une colonne pour l'axe des x et une ou plusieurs colonnes pour l'axe des y et preciser une des  colonne de y qu'on va representer comme dispersion.  afficher la courbe dans une nouvelle fenetre avec plt.show().
+    def courbe_from_dataframe(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        colonne_x = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne pour l'axe des X :"
+        )
+
+        if not colonne_x:
+            return
+
+        colonnes_y = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonnes pour l'axe des Y (séparées par des virgules) :"
+        )
+
+        if not colonnes_y:
+            return
+
+        colonnes_y = [col.strip() for col in colonnes_y.split(",")]
+
+        for col in colonnes_y:
+            if col not in self.df.columns:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Colonne introuvable : {col}"
+                )
+                return
+
+        dispersion_colonne = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne pour la dispersion (optionnelle, séparée par des virgules, laisser vide si aucune) :"
+        )
+
+        if dispersion_colonne:
+            dispersion_colonne = [col.strip() for col in dispersion_colonne.split(",")]
+            for col in dispersion_colonne:
+                if col not in self.df.columns:
+                    messagebox.showerror(
+                        "Erreur",
+                        f"Colonne introuvable : {col}"
+                    )
+                    return
+
+        plt.figure()
+
+        for col in colonnes_y:
+            plt.plot(self.df[colonne_x], self.df[col], label=col)
+
+        if dispersion_colonne and dispersion_colonne in self.df.columns:
+            plt.scatter(self.df[colonne_x], self.df[dispersion_colonne], color='red', label=dispersion_colonne)
+
+        plt.xlabel(colonne_x)
+        plt.ylabel("Valeurs")
+        plt.title("Graphique en courbe")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+    def courbe_blank(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        colonne_x = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nColonne pour l'axe des X :"
+        )
+
+        if not colonne_x:
+            return
+        if colonne_x not in self.df.columns:
+            messagebox.showerror(
+                "Erreur",
+                f"Colonne introuvable : {colonne_x}"
+            )
+            return
+
+        colonnes_y = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nEntrer les colonnes correspondante à la limite de détection et la limite d'alerte (séparées par des virgules) :"
+        )
+
+        if not colonnes_y:
+            return
+
+        colonnes_y = [col.strip() for col in colonnes_y.split(",")]
+
+        for col in colonnes_y:
+            if col not in self.df.columns:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Colonne introuvable : {col}"
+                )
+                return
+
+        dispersion_colonne = simpledialog.askstring(
+            "Graphique",
+            f"Colonnes disponibles :\n\n{list(self.df.columns)}\n\nEntrer la colonne correspondante à la teneur du blank :"
+        )
+
+        if not dispersion_colonne:
+            
+            return
+        if dispersion_colonne not in self.df.columns:
+            messagebox.showerror(
+                "Erreur",
+                f"Colonne introuvable : {dispersion_colonne}"
+            )
+            return
+
+        plt.figure()
+
+        for col in colonnes_y:
+            plt.plot(self.df[colonne_x], self.df[col], label=col)
+
+        if dispersion_colonne and dispersion_colonne in self.df.columns:
+            plt.scatter(self.df[colonne_x], self.df[dispersion_colonne], color='red', label=dispersion_colonne)
+
+        plt.xlabel(colonne_x)
+        plt.ylabel("Valeurs")
+        plt.title("Graphique blank")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
     
-        
-
-
 
 
 
@@ -1059,6 +1566,8 @@ if __name__ == "__main__":
 
     app = Application()
     app.executer()
+
+
 
 
 
