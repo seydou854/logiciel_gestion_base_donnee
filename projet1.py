@@ -117,10 +117,32 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
             menu=menu_affichage
         )
 
+### menu selection
+        menu_selection = tk.Menu(menu_bar, tearoff=0)
+
+        menu_selection.add_command(
+            label="Sélectionner tout",
+            command=self.selectionner_tout
+        )
+
+        menu_selection.add_command(
+            label="Désélectionner tout",
+            command=self.deselectionner_tout
+        )
+
+        menu_selection.add_command(
+            label="Selectionner avec curseur",
+            command=self.selectionner_avec_curseur
+        )
+        menu_bar.add_cascade(
+            label="Sélection",
+            menu=menu_selection
+        )
 ###menu edition 
 
         menu_edition = tk.Menu(menu_bar, tearoff=0)
         menu_atteindre = tk.Menu(menu_edition, tearoff=0)
+        menu_editer = tk.Menu(menu_edition, tearoff=0)
 
         menu_atteindre.add_command(
             label="Recherche",
@@ -133,6 +155,31 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
         menu_edition.add_cascade(
             label="Atteindre",
             menu=menu_atteindre
+        )
+        menu_editer.add_command(
+            label="Editer cellule",
+            command=self.editer_cellule
+        )
+        menu_editer.add_command(
+            label="arreter edition cellule",
+            command=self.arreter_edition_cellule
+        )
+        menu_edition.add_cascade(
+            label="Editer",
+            menu=menu_editer
+        )
+
+        menu_edition.add_command(
+            label="Copier",
+            command=self.copier_cellule
+        )
+        menu_edition.add_command(
+            label="Couper",
+            command=self.couper_cellule
+        )
+        menu_edition.add_command(
+            label="Coller",
+            command=self.coller_cellule
         )
 
         menu_bar.add_cascade(
@@ -608,7 +655,39 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
 
 
 
+# SELECTION
 
+    # definir les méthodes de sélection
+    # FONCTION POUR SELECTIONNER TOUTE LA BASE DE DONNEES
+    def selectionner_tout(self):
+        for item in self.tree.get_children():
+            self.tree.selection_add(item)
+# FOnction pour selectionner avec le curseur. l'utilisateur clique sur les cellules qu'il veut selectionner. il peut selectionner plusieurs cellules collées en maintenant la touche ctrl enfoncée. il peut selectionner une plage de cellules en maintenant la touche shift enfoncée. meme sans ces touches, il peut selectionner une cellule et la désélectionner en cliquant dessus. les cellules selectionnées sont surlignées en bleu.
+    def selectionner_avec_curseur(self):
+        messagebox.showinfo(
+            "Information",
+            "Maintenez la touche Ctrl pour sélectionner plusieurs cellules ou la touche Shift pour sélectionner une plage de cellules."
+        )
+        self.tree.bind("<Button-1>", self.selectionner_cellule) # lie l'événement de clic à la fonction de sélection
+
+
+    # fonction pour selectionner des cellules, soit des lignes seulement soit des colonne seulement soit des cellules a l'intereur de mon tableau
+    def selectionner_cellule(self, event):
+        item = self.tree.identify_row(event.y) # identifie la ligne sur laquelle l'utilisateur a cliqué
+        column = self.tree.identify_column(event.x) # identifie la colonne sur laquelle l'utilisateur a cliqué
+
+        if not item or not column:
+            return
+
+        if self.tree.selection(): # si la cellule est déjà sélectionnée, on la désélectionne
+            self.tree.selection_remove(item)
+        else: # sinon on la sélectionne
+            self.tree.selection_add(item)
+
+
+    def deselectionner_tout(self):
+        for item in self.tree.get_children():
+            self.tree.selection_remove(item)
 # -------------------------
     # EDITION
     # -------------------------
@@ -747,6 +826,147 @@ Si l'utilisateur clique sur Rétablir, on réapplique la modification annulée."
                 "Résultat",
                 f"Aucun résultat trouvé pour '{recherche}' dans la colonne '{colonne}'"
             )
+
+    # fonction qui sert à éditer des cellule c'est a dire de changer la valeur d'une cellule. Une fois la commande exécutée, l'utilisateur défile sur le tableau et s'il veut changer la valeur d'une céllule il clique deux fois sur la cellule et entre la nouvelle valeur.
+    def editer_cellule(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        messagebox.showinfo(
+            "Information",
+            "Double-cliquez sur une cellule pour la modifier."
+        )
+        self.tree.bind("<Double-1>", self.modifier_cellule) # lie l'événement de double-clic à la fonction de modification
+
+    def modifier_cellule(self, event):
+        item = self.tree.identify_row(event.y) # identifie la ligne sur laquelle l'utilisateur a cliqué
+        column = self.tree.identify_column(event.x) # identifie la colonne sur laquelle l'utilisateur a cliqué
+
+        if not item or not column:
+            return
+
+        index = int(self.tree.item(item, "text")) # récupère l'index de la ligne dans le DataFrame
+        col_index = int(column.replace("#", "")) - 1  # récupère l'index de la colonne dans le DataFrame
+        col_name = self.df.columns[col_index]  # récupère le nom de la colonne dans le DataFrame
+
+        nouvelle_valeur = simpledialog.askstring(
+            "Modifier cellule",
+            f"Nouvelle valeur pour la cellule ({index}, {col_name}) :"
+        )
+
+        if nouvelle_valeur is None:
+            return
+
+        self.sauvegarder_etat()
+        self.df.at[index, col_name] = nouvelle_valeur # modifie la valeur de la cellule dans le DataFrame
+        self.afficher_donnees()
+    # fonction qui sert à désactiver l'édition des cellules. Une fois la commande exécutée, l'utilisateur ne peut plus modifier les cellules du tableau.
+    def arreter_edition_cellule(self):
+        self.tree.unbind("<Double-1>") # désactive l'édition des cellules
+        messagebox.showinfo(
+            "Information",
+            "L'édition des cellules est désactivée."
+        )
+
+    # methode pour copier cellule, ligne ou colonne sélectionnée 
+    def copier_cellule(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        selection = self.tree.selection()
+
+        if not selection:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune cellule sélectionnée"
+            )
+            return
+
+        self.copie = []
+
+        for item in selection:
+            index = int(self.tree.item(item, "text"))
+            valeurs = self.tree.item(item, "values")
+            self.copie.append((index, valeurs))
+
+        messagebox.showinfo(
+            "Succès",
+            f"{len(self.copie)} cellules copiées"
+        )
+    
+    # methode pour couper cellule, ligne ou colonne sélectionnée
+    def couper_cellule(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        selection = self.tree.selection()
+
+        if not selection:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune cellule sélectionnée"
+            )
+            return
+
+        self.copie = []
+
+        self.sauvegarder_etat() # permet de sauvegarder l'état actuel du DataFrame avant de le modifier. Cela permet de revenir en arrière si nécessaire.
+        for item in selection:
+            index = int(self.tree.item(item, "text"))
+            valeurs = self.tree.item(item, "values")
+            self.copie.append((index, valeurs)) # permet de copier les valeurs de la cellule sélectionnée dans une liste. comment? 
+            self.df.drop(index, inplace=True)
+
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"{len(self.copie)} cellules coupées"
+        )
+    # methode pour coller cellule, ligne ou colonne sélectionnée
+    def coller_cellule(self):
+        if self.df is None:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune donnée chargée"
+            )
+            return
+
+        if not hasattr(self, 'copie') or not self.copie:
+            messagebox.showwarning(
+                "Attention",
+                "Aucune cellule copiée"
+            ) # vérifie si l'attribut 'copie' existe et s'il contient des données. Si ce n'est pas le cas, cela signifie qu'aucune cellule n'a été copiée ou coupée, et la fonction affiche un message d'avertissement à l'utilisateur.
+            return
+
+        self.sauvegarder_etat() # permet de sauvegarder l'état actuel du DataFrame avant de le modifier. Cela permet de revenir en arrière si nécessaire.
+
+        for index, valeurs in self.copie:
+            if index in self.df.index:
+                self.df.loc[index] = valeurs
+            else:
+                self.df.loc[index] = valeurs
+
+        self.afficher_donnees()
+
+        messagebox.showinfo(
+            "Succès",
+            f"{len(self.copie)} cellules collées"
+        )
+
+
 
 # -------------------------
     # TRAITEMENT DES DONNÉES
